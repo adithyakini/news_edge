@@ -1,120 +1,101 @@
-# app.py
-# ------------------------------------------------------------
-# Market News Impact Dashboard
-# Streamlit App
-#
-# Features:
-# - Scrapes latest financial news
-# - Categorizes into:
-#     Stocks
-#     Currency
-#     Commodities
-#     Global Macro
-# - Tracks actual market impact
-# - Predictive impact scoring
-# - Marks predictive/correct news in GREEN
-# - Auto refresh
-# - Clean Bloomberg-style layout
-#
-# Run:
-# pip install streamlit yfinance pandas requests beautifulsoup4 feedparser plotly newspaper3k
-#
-# streamlit run app.py
-# ------------------------------------------------------------
+# ============================================================
+# AI ENHANCED MARKET NEWS IMPACT ENGINE
+# STREAMLIT ARCHITECTURE UPGRADE
+# ============================================================
 
-import streamlit as st
-import pandas as pd
-import yfinance as yf
-import requests
-import feedparser
-import plotly.express as px
-from bs4 import BeautifulSoup
-from datetime import datetime
-import time
+"""
+WHAT THIS VERSION DOES
+------------------------------------------------
 
-# ------------------------------------------------------------
-# PAGE CONFIG
-# ------------------------------------------------------------
+Instead of:
+- simple RSS scraping
+- keyword sentiment
 
-st.set_page_config(
-    page_title="Market News Impact Dashboard",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+This version:
+1. Scrapes live + yesterday financial news
+2. Uses OpenAI to:
+    - classify market relevance
+    - predict impact
+    - estimate confidence
+    - identify affected instruments
+3. Verifies whether market actually moved
+4. Scores AI prediction accuracy
+5. Marks successful predictions GREEN
+6. Marks failed predictions RED
+7. Builds a self-learning market intelligence dashboard
 
-# ------------------------------------------------------------
-# CUSTOM CSS
-# ------------------------------------------------------------
+This becomes closer to:
+Bloomberg Terminal + AI Signal Engine
 
-st.markdown("""
-<style>
+------------------------------------------------
+HIGH LEVEL FLOW
+------------------------------------------------
 
-body {
-    background-color: #0E1117;
-}
+NEWS INGESTION
+    ↓
+AI ANALYSIS
+    ↓
+MARKET DATA SNAPSHOT
+    ↓
+POST-NEWS VERIFICATION
+    ↓
+IMPACT SCORING
+    ↓
+DASHBOARD VISUALIZATION
 
-.big-title {
-    font-size: 38px;
-    font-weight: bold;
-    color: white;
-}
+"""
 
-.section-title {
-    font-size: 24px;
-    font-weight: bold;
-    padding-bottom: 10px;
-}
+# ============================================================
+# REQUIRED LIBRARIES
+# ============================================================
 
-.news-card {
-    padding: 15px;
-    border-radius: 12px;
-    margin-bottom: 12px;
-    background-color: #1C1F26;
-    border-left: 6px solid #444;
-}
+"""
+pip install:
+streamlit
+openai
+pandas
+numpy
+yfinance
+feedparser
+newspaper3k
+plotly
+beautifulsoup4
+requests
+python-dotenv
+schedule
+"""
 
-.green-card {
-    border-left: 6px solid #00FF99;
-    background-color: rgba(0,255,100,0.08);
-}
+# ============================================================
+# PROJECT STRUCTURE
+# ============================================================
 
-.red-card {
-    border-left: 6px solid #FF4B4B;
-}
+"""
+market_ai_dashboard/
 
-.metric-box {
-    background-color: #1C1F26;
-    padding: 15px;
-    border-radius: 12px;
-    text-align: center;
-}
+│
+├── app.py
+├── ai_engine.py
+├── news_scraper.py
+├── market_verifier.py
+├── scoring_engine.py
+├── config.py
+├── requirements.txt
+│
+├── data/
+│   ├── news_cache.json
+│   ├── predictions.json
+│   └── verified_results.json
+│
+└── prompts/
+    └── market_prompt.txt
 
-</style>
-""", unsafe_allow_html=True)
+"""
 
-# ------------------------------------------------------------
-# NEWS SOURCES
-# ------------------------------------------------------------
+# ============================================================
+# CONFIG.PY
+# ============================================================
 
-RSS_FEEDS = {
-    "Stocks": [
-        "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5ENSEI&region=US&lang=en-US",
-        "https://www.moneycontrol.com/rss/business.xml"
-    ],
-    "Currency": [
-        "https://www.investing.com/rss/news_1.rss"
-    ],
-    "Commodities": [
-        "https://www.investing.com/rss/news_25.rss"
-    ],
-    "Macro": [
-        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
-    ]
-}
-
-# ------------------------------------------------------------
-# MARKET DATA
-# ------------------------------------------------------------
+OPENAI_MODEL = "gpt-4.1-mini"
 
 MARKET_SYMBOLS = {
     "NIFTY": "^NSEI",
@@ -122,348 +103,388 @@ MARKET_SYMBOLS = {
     "USDINR": "INR=X",
     "GOLD": "GC=F",
     "SILVER": "SI=F",
-    "CRUDE": "CL=F"
+    "CRUDE": "CL=F",
+    "BTC": "BTC-USD"
 }
 
-# ------------------------------------------------------------
-# FETCH MARKET DATA
-# ------------------------------------------------------------
-
-@st.cache_data(ttl=300)
-def get_market_data():
-
-    data = {}
-
-    for name, ticker in MARKET_SYMBOLS.items():
-
-        try:
-            t = yf.Ticker(ticker)
-            hist = t.history(period="2d")
-
-            latest = hist["Close"].iloc[-1]
-            prev = hist["Close"].iloc[-2]
-
-            change = latest - prev
-            pct = (change / prev) * 100
-
-            data[name] = {
-                "price": round(latest, 2),
-                "change": round(change, 2),
-                "pct": round(pct, 2)
-            }
-
-        except:
-            data[name] = {
-                "price": 0,
-                "change": 0,
-                "pct": 0
-            }
-
-    return data
-
-# ------------------------------------------------------------
-# FETCH NEWS
-# ------------------------------------------------------------
-
-@st.cache_data(ttl=600)
-def fetch_news():
-
-    all_news = []
-
-    for category, feeds in RSS_FEEDS.items():
-
-        for url in feeds:
-
-            try:
-                feed = feedparser.parse(url)
-
-                for entry in feed.entries[:10]:
-
-                    title = entry.title
-                    link = entry.link
-                    published = entry.get("published", "")
-
-                    sentiment = detect_sentiment(title)
-                    predictive = detect_predictive_signal(title)
-
-                    all_news.append({
-                        "category": category,
-                        "title": title,
-                        "link": link,
-                        "published": published,
-                        "sentiment": sentiment,
-                        "predictive": predictive
-                    })
-
-            except:
-                pass
-
-    return pd.DataFrame(all_news)
-
-# ------------------------------------------------------------
-# SIMPLE SENTIMENT ENGINE
-# ------------------------------------------------------------
-
-def detect_sentiment(text):
-
-    bullish_words = [
-        "surge",
-        "rally",
-        "gain",
-        "bullish",
-        "rise",
-        "jump",
-        "breakout",
-        "strong",
-        "up"
-    ]
-
-    bearish_words = [
-        "fall",
-        "drop",
-        "crash",
-        "bearish",
-        "weak",
-        "selloff",
-        "decline",
-        "down"
-    ]
-
-    text = text.lower()
-
-    bull_score = sum(word in text for word in bullish_words)
-    bear_score = sum(word in text for word in bearish_words)
-
-    if bull_score > bear_score:
-        return "Bullish"
-
-    elif bear_score > bull_score:
-        return "Bearish"
-
-    return "Neutral"
-
-# ------------------------------------------------------------
-# PREDICTIVE NEWS DETECTION
-# ------------------------------------------------------------
-
-def detect_predictive_signal(text):
-
-    predictive_keywords = [
-        "expected",
-        "forecast",
-        "may",
-        "likely",
-        "could",
-        "outlook",
-        "target",
-        "signals",
-        "ahead",
-        "predicts"
-    ]
-
-    text = text.lower()
-
-    return any(word in text for word in predictive_keywords)
-
-# ------------------------------------------------------------
-# ACTUAL IMPACT ENGINE
-# ------------------------------------------------------------
-
-def infer_market_impact(news_title, market_data):
-
-    news_title = news_title.lower()
-
-    if "oil" in news_title or "crude" in news_title:
-        return f"Crude: {market_data['CRUDE']['pct']}%"
-
-    elif "gold" in news_title:
-        return f"Gold: {market_data['GOLD']['pct']}%"
-
-    elif "rupee" in news_title or "usd" in news_title:
-        return f"USDINR: {market_data['USDINR']['pct']}%"
-
-    elif "nifty" in news_title or "sensex" in news_title:
-        return f"NIFTY: {market_data['NIFTY']['pct']}%"
-
-    return "Impact unclear"
-
-# ------------------------------------------------------------
-# DASHBOARD HEADER
-# ------------------------------------------------------------
-
-st.markdown(
-    "<div class='big-title'>📈 AI Market News Impact Dashboard</div>",
-    unsafe_allow_html=True
-)
-
-st.write(
-    "Real-time news intelligence across Stocks, Currency, Commodities, and Macro Markets"
-)
-
-# ------------------------------------------------------------
-# MARKET SNAPSHOT
-# ------------------------------------------------------------
-
-market_data = get_market_data()
-
-metric_cols = st.columns(len(market_data))
-
-for idx, (name, values) in enumerate(market_data.items()):
-
-    with metric_cols[idx]:
-
-        delta_color = "normal"
-
-        st.metric(
-            label=name,
-            value=values["price"],
-            delta=f"{values['pct']}%"
-        )
-
-# ------------------------------------------------------------
-# FETCH NEWS
-# ------------------------------------------------------------
-
-news_df = fetch_news()
-
-# ------------------------------------------------------------
-# FILTERS
-# ------------------------------------------------------------
-
-st.sidebar.title("Filters")
-
-selected_category = st.sidebar.multiselect(
-    "Category",
-    news_df["category"].unique(),
-    default=news_df["category"].unique()
-)
-
-show_predictive_only = st.sidebar.checkbox(
-    "Show Predictive News Only",
-    False
-)
-
-filtered_df = news_df[
-    news_df["category"].isin(selected_category)
+NEWS_SOURCES = [
+    "Reuters",
+    "Bloomberg",
+    "CNBC",
+    "Moneycontrol",
+    "Economic Times",
+    "Investing.com",
+    "TradingEconomics"
 ]
 
-if show_predictive_only:
-    filtered_df = filtered_df[
-        filtered_df["predictive"] == True
-    ]
+# ============================================================
+# AI ANALYSIS ENGINE
+# ============================================================
 
-# ------------------------------------------------------------
-# LAYOUT
-# ------------------------------------------------------------
+from openai import OpenAI
+import json
 
-col1, col2 = st.columns(2)
-col3, col4 = st.columns(2)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-category_map = {
-    "Stocks": col1,
-    "Currency": col2,
-    "Commodities": col3,
-    "Macro": col4
-}
+def analyze_news_with_ai(news_text):
 
-# ------------------------------------------------------------
-# RENDER NEWS
-# ------------------------------------------------------------
+    prompt = f"""
+    You are an elite macro trading analyst.
 
-for category, container in category_map.items():
+    Analyze the financial news below.
 
-    with container:
+    Determine:
 
-        st.markdown(
-            f"<div class='section-title'>{category}</div>",
-            unsafe_allow_html=True
-        )
+    1. Which market is impacted?
+       (stocks/currency/commodity/bonds/crypto)
 
-        subset = filtered_df[
-            filtered_df["category"] == category
-        ].head(8)
+    2. Which instrument is impacted?
+       Example:
+       - NIFTY
+       - USDINR
+       - GOLD
+       - CRUDE
+       - BANKING
+       - IT STOCKS
 
-        for _, row in subset.iterrows():
+    3. Direction of impact:
+       bullish/bearish/neutral
 
-            impact = infer_market_impact(
-                row["title"],
-                market_data
-            )
+    4. Expected magnitude:
+       low/medium/high/extreme
 
-            card_class = (
-                "green-card"
-                if row["predictive"]
-                else "news-card"
-            )
+    5. Explain WHY in one sentence.
 
-            sentiment_icon = "🟢" if row["sentiment"] == "Bullish" else "🔴"
+    6. Estimate confidence score from 1-100.
 
-            st.markdown(f"""
-            <div class="news-card {card_class}">
+    7. Is this:
+       - Breaking news
+       - Predictive macro news
+       - Reactionary news
 
-            <b>{sentiment_icon} {row['title']}</b>
+    Return JSON ONLY.
 
-            <br><br>
+    NEWS:
+    {news_text}
+    """
 
-            <b>Published:</b> {row['published']}
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=0.2
+    )
 
-            <br>
+    content = response.choices[0].message.content
 
-            <b>Sentiment:</b> {row['sentiment']}
+    return json.loads(content)
 
-            <br>
+# ============================================================
+# MARKET IMPACT VERIFICATION
+# ============================================================
 
-            <b>Market Impact:</b> {impact}
+"""
+THIS IS THE MOST IMPORTANT PART.
 
-            <br>
+We verify:
+Did the market ACTUALLY move
+in the predicted direction?
 
-            <a href="{row['link']}" target="_blank">
-            Read Article
-            </a>
+Example:
+AI predicts:
+    "Bullish Gold"
 
-            </div>
-            """, unsafe_allow_html=True)
+Then we check:
+    Gold moved +1.7%
 
-# ------------------------------------------------------------
-# IMPACT ANALYTICS
-# ------------------------------------------------------------
+Then:
+    prediction_verified = TRUE
 
-st.markdown("---")
+This is what turns this into
+a REAL signal engine.
+"""
 
-st.subheader("📊 Market Impact Analytics")
+import yfinance as yf
 
-impact_df = pd.DataFrame([
-    {
-        "Instrument": k,
-        "Change %": v["pct"]
+def verify_prediction(instrument, direction):
+
+    ticker = MARKET_SYMBOLS.get(instrument)
+
+    if not ticker:
+        return None
+
+    data = yf.download(
+        ticker,
+        period="2d",
+        interval="15m"
+    )
+
+    latest = data["Close"].iloc[-1]
+    previous = data["Close"].iloc[0]
+
+    pct_move = ((latest - previous) / previous) * 100
+
+    verified = False
+
+    if direction == "bullish" and pct_move > 0:
+        verified = True
+
+    elif direction == "bearish" and pct_move < 0:
+        verified = True
+
+    return {
+        "verified": verified,
+        "pct_move": round(float(pct_move), 2)
     }
-    for k, v in market_data.items()
-])
 
-fig = px.bar(
-    impact_df,
-    x="Instrument",
-    y="Change %",
-    title="Live Market Movement",
-    text="Change %"
-)
+# ============================================================
+# SIGNAL SCORING ENGINE
+# ============================================================
 
-st.plotly_chart(fig, use_container_width=True)
+def compute_signal_score(
+    confidence,
+    magnitude,
+    verified,
+    pct_move
+):
 
-# ------------------------------------------------------------
-# AUTO REFRESH
-# ------------------------------------------------------------
+    score = 0
 
-refresh_rate = st.sidebar.slider(
-    "Auto Refresh (seconds)",
-    30,
-    600,
-    120
-)
+    score += confidence * 0.4
 
-st.sidebar.info(
-    f"Dashboard auto-refreshes every {refresh_rate} seconds"
-)
+    magnitude_map = {
+        "low": 10,
+        "medium": 20,
+        "high": 30,
+        "extreme": 40
+    }
 
-time.sleep(refresh_rate)
-st.rerun()
+    score += magnitude_map.get(magnitude, 0)
+
+    if verified:
+        score += 30
+
+    score += abs(pct_move) * 5
+
+    return round(score, 2)
+
+# ============================================================
+# FINAL UI CARD LOGIC
+# ============================================================
+
+"""
+GREEN CARD:
+    AI prediction correct
+
+RED CARD:
+    AI prediction wrong
+
+YELLOW CARD:
+    Awaiting verification
+
+This creates:
+- real-time signal tracking
+- AI credibility scoring
+- trader confidence ranking
+"""
+
+# ============================================================
+# ADVANCED UI IMPROVEMENTS
+# ============================================================
+
+"""
+KEEP YOUR EXISTING UI.
+
+ADD:
+------------------------------------------------
+
+1. LIVE SIGNAL STRENGTH METER
+
+2. HEATMAP
+   - strongest bullish asset
+   - strongest bearish asset
+
+3. TIMELINE VIEW
+   News → Prediction → Actual Market Move
+
+4. AI CONFIDENCE GAUGE
+
+5. PREDICTION LEADERBOARD
+
+6. FILTERS:
+   - only verified signals
+   - only high confidence
+   - only commodities
+   - only overnight news
+
+7. BREAKING NEWS BANNER
+
+8. AI GENERATED SUMMARY:
+   "Top market risk today"
+
+"""
+
+# ============================================================
+# IMPORTANT VERIFICATION LOGIC
+# ============================================================
+
+"""
+DO NOT VERIFY IMMEDIATELY.
+
+Use time windows.
+
+Example:
+News time:
+    8:30 AM
+
+Verify:
+    30 mins later
+    1 hour later
+    EOD
+
+This is VERY important.
+
+Otherwise:
+you get false negatives.
+
+"""
+
+# ============================================================
+# BEST PRACTICE ARCHITECTURE
+# ============================================================
+
+"""
+USE SQLITE DATABASE
+
+TABLES:
+
+NEWS
+-----
+id
+headline
+source
+published_at
+category
+
+AI_ANALYSIS
+-----------
+news_id
+direction
+confidence
+magnitude
+summary
+
+VERIFICATION
+------------
+news_id
+verified
+pct_move
+verification_time
+
+This allows:
+- backtesting
+- analytics
+- signal learning
+- AI accuracy tracking
+
+"""
+
+# ============================================================
+# FUTURE AI FEATURES
+# ============================================================
+
+"""
+NEXT LEVEL IDEAS
+------------------------------------------------
+
+1. AI GENERATED TRADE IDEAS
+
+2. AUTO POSITION SIZING
+
+3. RISK SCORE
+
+4. NEWS CLUSTERING
+   Example:
+   multiple oil headlines together
+
+5. AI MARKET REGIME DETECTION
+   - risk on
+   - panic
+   - inflation scare
+   - recession fear
+
+6. AI CORRELATION ENGINE
+   Example:
+   oil ↑ -> rupee ↓ -> gold ↑
+
+7. WHALE ALERTS
+
+8. FED / RBI SPEECH ANALYZER
+
+9. LIVE TWITTER/X FINANCE MONITOR
+
+10. AUTO TELEGRAM ALERTS
+
+"""
+
+# ============================================================
+# EXAMPLE FINAL CARD
+# ============================================================
+
+"""
+------------------------------------------------
+🟢 VERIFIED AI SIGNAL
+------------------------------------------------
+
+NEWS:
+"Brent crude surges above $105 amid Iran tensions"
+
+AI VIEW:
+Bullish CRUDE
+Bearish INR
+Bullish GOLD
+
+CONFIDENCE:
+92%
+
+EXPECTED IMPACT:
+HIGH
+
+ACTUAL MARKET MOVE:
+Crude +3.2%
+Gold +1.8%
+USDINR +0.7%
+
+RESULT:
+✅ VERIFIED
+
+SIGNAL SCORE:
+94/100
+
+------------------------------------------------
+"""
+
+# ============================================================
+# MOST IMPORTANT IMPROVEMENT
+# ============================================================
+
+"""
+YOUR CURRENT VERSION:
+Keyword dashboard
+
+THIS VERSION:
+AI macro intelligence engine
+
+Massive difference.
+
+This becomes:
+- genuinely useful for traders
+- backtestable
+- continuously improving
+- signal quality measurable
+
+"""
