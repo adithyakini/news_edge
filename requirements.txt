@@ -2,3 +2,4 @@ streamlit
 gTTS
 Pillow
 streamlit_autorefresh
+yfinance
