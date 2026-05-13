@@ -1,7 +1,12 @@
 streamlit
-gTTS
-Pillow
-streamlit_autorefresh
+openai
+pandas
+numpy
 yfinance
 feedparser
-plotly.express
+newspaper3k
+plotly
+beautifulsoup4
+requests
+python-dotenv
+schedule
