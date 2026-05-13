@@ -124,7 +124,7 @@ NEWS_SOURCES = [
 from openai import OpenAI
 import json
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def analyze_news_with_ai(news_text):
 
