@@ -4,3 +4,4 @@ Pillow
 streamlit_autorefresh
 yfinance
 feedparser
+plotly.express
