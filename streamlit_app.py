@@ -122,6 +122,7 @@ NEWS_SOURCES = [
 # ============================================================
 
 from openai import OpenAI
+import streamlit as st
 import json
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
