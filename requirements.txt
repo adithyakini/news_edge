@@ -3,3 +3,4 @@ gTTS
 Pillow
 streamlit_autorefresh
 yfinance
+feedparser
