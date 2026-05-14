@@ -1,6 +1,5 @@
 import feedparser
 from newspaper import Article
-from datetime import datetime
 
 def fetch_news(feed_urls, limit=5):
 
@@ -8,30 +7,48 @@ def fetch_news(feed_urls, limit=5):
 
     for url in feed_urls:
 
+        print(f"Fetching feed: {url}")
+
         try:
+
             feed = feedparser.parse(url)
+
+            if not feed.entries:
+                print(f"No entries found in {url}")
+                continue
 
             for entry in feed.entries[:10]:
 
                 try:
-                    article = Article(entry.link)
-                    article.download()
-                    article.parse()
+
+                    print(f"Processing: {entry.title}")
+
+                    summary = ""
+
+                    try:
+                        article = Article(entry.link)
+                        article.download()
+                        article.parse()
+                        summary = article.text[:3000]
+
+                    except Exception as e:
+                        print(f"Article parse failed: {e}")
+                        summary = entry.get("summary", "")
 
                     articles.append({
                         "title": entry.title,
                         "link": entry.link,
-                        "published": entry.get("published", ""),
-                        "summary": article.text[:3000]
+                        "published": entry.get("published", "Unknown"),
+                        "summary": summary
                     })
 
-                except:
-                    continue
+                except Exception as e:
+                    print(f"Entry error: {e}")
 
-        except:
-            continue
+        except Exception as e:
+            print(f"Feed error: {e}")
 
-    # Remove duplicates
+    # remove duplicates
     unique = []
     seen = set()
 
@@ -40,5 +57,7 @@ def fetch_news(feed_urls, limit=5):
         if a["title"] not in seen:
             unique.append(a)
             seen.add(a["title"])
+
+    print(f"TOTAL ARTICLES FETCHED: {len(unique)}")
 
     return unique[:limit]
