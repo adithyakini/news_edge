@@ -1,63 +1,93 @@
 import streamlit as st
 
-from config import NEWS_SOURCES
+from config import SEARCH_QUERIES
 
-from services.news_fetcher import fetch_news
-from services.ai_engine import analyze_news
-from services.market_verifier import verify_prediction
+from services.intelligent_news_search import search_news
+from services.ai_analysis import analyze_article
+from services.verifier import verify_market_move
+from services.narrative_engine import generate_market_narrative
 
 from ui.tiles import render_tile
 
+from streamlit_autorefresh import st_autorefresh
+
 st.set_page_config(
-    page_title="AI Market News Impact Engine",
+    page_title="AI Macro Intelligence Terminal",
     layout="wide"
 )
 
-st.title("AI ENHANCED MARKET NEWS IMPACT ENGINE")
+st_autorefresh(interval=300000)
 
-sections = {
-    "NSE STOCKS": NEWS_SOURCES["stocks"],
-    "COMMODITIES": NEWS_SOURCES["commodities"],
-    "CURRENCY": NEWS_SOURCES["currency"]
-}
+st.title("AI MACRO MARKET INTELLIGENCE TERMINAL")
 
-for section_name, feeds in sections.items():
+all_news = []
 
-    st.header(section_name)
+for section, queries in SEARCH_QUERIES.items():
 
-    with st.spinner(f"Loading {section_name}..."):
+    st.header(section)
 
-        news_items = fetch_news(feeds, limit=5)
+    section_news = []
 
-    if not news_items:
+    for query in queries:
 
-        st.error(f"No news found for {section_name}")
+        news = search_news(query, limit=2)
 
-        continue
+        section_news.extend(news)
 
-    st.success(f"{len(news_items)} articles loaded")
+    # remove duplicates
+    unique = []
 
-    cols = st.columns(3)
+    seen = set()
 
-    for idx, news in enumerate(news_items):
+    for n in section_news:
 
-        try:
+        if n["title"] not in seen:
+            unique.append(n)
+            seen.add(n["title"])
 
-            ai_data = analyze_news(news)
+    # AI analysis
+    analyzed = []
 
-            verification = verify_prediction(
-                ai_data.get("instrument"),
-                ai_data.get("sentiment")
+    for article in unique:
+
+        analysis = analyze_article(article)
+
+        if analysis.get("impact_score", 0) >= 7:
+
+            verification = verify_market_move(
+                section,
+                analysis.get("sentiment")
             )
+
+            analyzed.append({
+                "news": article,
+                "analysis": analysis,
+                "verification": verification
+            })
+
+    # sort by impact
+    analyzed = sorted(
+        analyzed,
+        key=lambda x: x["analysis"]["impact_score"],
+        reverse=True
+    )
+
+    if analyzed:
+
+        narrative = generate_market_narrative(
+            [x["news"] for x in analyzed]
+        )
+
+        st.info(narrative)
+
+        cols = st.columns(3)
+
+        for idx, item in enumerate(analyzed[:5]):
 
             with cols[idx % 3]:
 
                 render_tile(
-                    news,
-                    ai_data,
-                    verification
+                    item["news"],
+                    item["analysis"],
+                    item["verification"]
                 )
-
-        except Exception as e:
-
-            st.error(f"Tile failed: {e}")
