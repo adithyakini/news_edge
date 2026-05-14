@@ -1,36 +1,54 @@
-from GoogleNews import GoogleNews
+import feedparser
 from newspaper import Article
+from urllib.parse import quote
+
 
 def search_news(query, limit=5):
 
-    googlenews = GoogleNews(lang='en')
+    encoded_query = quote(query)
 
-    googlenews.search(query)
+    rss_url = (
+        f"https://news.google.com/rss/search?"
+        f"q={encoded_query}&hl=en-IN&gl=IN&ceid=IN:en"
+    )
 
-    results = googlenews.result()
+    feed = feedparser.parse(rss_url)
 
     articles = []
 
-    for item in results[:limit]:
+    for entry in feed.entries[:limit]:
 
         try:
 
-            title = item.get("title", "")
-            link = item.get("link", "")
+            link = entry.link
+            title = entry.title
 
-            article = Article(link)
-            article.download()
-            article.parse()
+            summary = ""
 
-            text = article.text[:4000]
+            try:
+
+                article = Article(link)
+
+                article.download()
+                article.parse()
+
+                summary = article.text[:4000]
+
+            except Exception as e:
+
+                print(f"Article parse failed: {e}")
+
+                summary = entry.get("summary", "")
 
             articles.append({
+
                 "title": title,
                 "link": link,
-                "summary": text
+                "summary": summary
             })
 
-        except:
-            continue
+        except Exception as e:
+
+            print(f"Entry failed: {e}")
 
     return articles
