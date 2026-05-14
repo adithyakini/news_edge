@@ -6,30 +6,35 @@ import json
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 SYSTEM_PROMPT = """
-You are a professional financial analyst.
+You are a professional macro strategist.
 
-Analyze the article and return ONLY valid JSON.
+Analyze the market significance of the article.
 
-Format:
+Determine:
 
-{
-    "instrument": "",
-    "sentiment": "",
-    "confidence": 0,
-    "trade_idea": "",
-    "time_horizon": "",
-    "high_impact": true
-}
+1. Impact score (1-10)
+2. Priority:
+   LOW / MEDIUM / HIGH / CRITICAL
+3. Affected instruments
+4. Bullish/Bearish/Neutral
+5. Trade implication
+6. Why this matters
+7. Confidence score
+8. Expected market reaction
+
+Return ONLY valid JSON.
 """
 
-def analyze_news(article):
+def analyze_article(article):
 
     try:
 
         response = client.chat.completions.create(
+
             model="gpt-4.1-mini",
 
             messages=[
+
                 {
                     "role": "system",
                     "content": SYSTEM_PROMPT
@@ -52,10 +57,6 @@ def analyze_news(article):
 
         content = response.choices[0].message.content
 
-        print("AI RESPONSE:")
-        print(content)
-
-        # clean markdown json blocks if present
         content = content.replace("```json", "")
         content = content.replace("```", "")
 
@@ -63,13 +64,12 @@ def analyze_news(article):
 
     except Exception as e:
 
-        print(f"AI ERROR: {e}")
-
         return {
-            "instrument": "Unknown",
+            "impact_score": 0,
+            "priority": "LOW",
+            "affected_instruments": [],
             "sentiment": "Neutral",
-            "confidence": 0,
-            "trade_idea": "AI analysis failed",
-            "time_horizon": "-",
-            "high_impact": False
+            "trade_implication": "Analysis failed",
+            "why_this_matters": str(e),
+            "confidence_score": 0
         }
