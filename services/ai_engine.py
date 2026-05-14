@@ -2,7 +2,7 @@ from openai import OpenAI
 from config import OPENAI_API_KEY
 import json
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 SYSTEM_PROMPT = """
 You are a professional financial analyst.
