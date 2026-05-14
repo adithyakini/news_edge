@@ -1,4 +1,5 @@
 import streamlit as st
+
 from config import NEWS_SOURCES
 
 from services.news_fetcher import fetch_news
@@ -14,8 +15,6 @@ st.set_page_config(
 
 st.title("AI ENHANCED MARKET NEWS IMPACT ENGINE")
 
-st.markdown("---")
-
 sections = {
     "NSE STOCKS": NEWS_SOURCES["stocks"],
     "COMMODITIES": NEWS_SOURCES["commodities"],
@@ -26,23 +25,39 @@ for section_name, feeds in sections.items():
 
     st.header(section_name)
 
-    news_items = fetch_news(feeds, limit=5)
+    with st.spinner(f"Loading {section_name}..."):
+
+        news_items = fetch_news(feeds, limit=5)
+
+    if not news_items:
+
+        st.error(f"No news found for {section_name}")
+
+        continue
+
+    st.success(f"{len(news_items)} articles loaded")
 
     cols = st.columns(3)
 
     for idx, news in enumerate(news_items):
 
-        ai_data = analyze_news(news)
+        try:
 
-        verification = verify_prediction(
-            ai_data.get("instrument"),
-            ai_data.get("sentiment")
-        )
+            ai_data = analyze_news(news)
 
-        with cols[idx % 3]:
-
-            render_tile(
-                news,
-                ai_data,
-                verification
+            verification = verify_prediction(
+                ai_data.get("instrument"),
+                ai_data.get("sentiment")
             )
+
+            with cols[idx % 3]:
+
+                render_tile(
+                    news,
+                    ai_data,
+                    verification
+                )
+
+        except Exception as e:
+
+            st.error(f"Tile failed: {e}")
