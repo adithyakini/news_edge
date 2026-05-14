@@ -1,58 +1,58 @@
 import streamlit as st
 
-def render_tile(news, ai_data, verification):
+def render_tile(news, analysis, verification):
 
-    sentiment = ai_data.get("sentiment", "Neutral")
+    priority = analysis.get("priority", "LOW")
 
-    if sentiment == "Bullish":
-        color = "#0f5132"
+    colors = {
+        "LOW": "#3d3d3d",
+        "MEDIUM": "#8a6d3b",
+        "HIGH": "#0b5394",
+        "CRITICAL": "#7f0000"
+    }
 
-    elif sentiment == "Bearish":
-        color = "#842029"
-
-    else:
-        color = "#664d03"
+    bg = colors.get(priority)
 
     st.markdown(
         f"""
         <div style="
-            background-color:{color};
-            padding:18px;
-            border-radius:16px;
+            background:{bg};
+            padding:20px;
+            border-radius:20px;
             margin-bottom:20px;
             color:white;
-            min-height:350px;
-            box-shadow:0px 4px 15px rgba(0,0,0,0.3);
+            min-height:480px;
+            box-shadow:0px 6px 20px rgba(0,0,0,0.4);
         ">
 
-        <h4>{news['title']}</h4>
-
-        <p>
-        <b>Published:</b> {news['published']}
-        </p>
+        <h3>{news['title']}</h3>
 
         <hr>
 
-        <p><b>Instrument:</b> {ai_data.get('instrument')}</p>
+        <p><b>Priority:</b> {priority}</p>
 
-        <p><b>AI Bias:</b> {sentiment}</p>
+        <p><b>Impact Score:</b> {analysis.get('impact_score')}/10</p>
 
-        <p><b>Confidence:</b> {ai_data.get('confidence')}%</p>
+        <p><b>Sentiment:</b> {analysis.get('sentiment')}</p>
 
-        <p><b>Trade Idea:</b> {ai_data.get('trade_idea')}</p>
+        <p><b>Confidence:</b> {analysis.get('confidence_score')}%</p>
 
-        <p><b>Time Horizon:</b> {ai_data.get('time_horizon')}</p>
+        <p><b>Trade Implication:</b></p>
+        <p>{analysis.get('trade_implication')}</p>
 
         <hr>
 
-        <p><b>Actual Move:</b> {verification.get('actual_move')}%</p>
+        <p><b>Why This Matters</b></p>
 
-        <p><b>Actual Direction:</b> {verification.get('actual_direction')}</p>
+        <p>{analysis.get('why_this_matters')}</p>
 
-        <p>
-        <b>Prediction Correct:</b>
-        {verification.get('prediction_correct')}
-        </p>
+        <hr>
+
+        <p><b>Actual Market Move:</b>
+        {verification.get('move')}%</p>
+
+        <p><b>Prediction Correct:</b>
+        {verification.get('correct')}</p>
 
         </div>
         """,
